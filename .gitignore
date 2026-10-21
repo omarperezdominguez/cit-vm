@@ -1,0 +1,16 @@
+# Secretos: nunca al repo
+.env
+secretos.env
+*.key
+api.env
+
+# Python / Node
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# Bases de datos locales de prueba
+*.db
+*.db-wal
+*.db-shm

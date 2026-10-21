@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel Edge</title>
+<style>
+  :root { --fondo:#f6f7f9; --tarjeta:#fff; --texto:#1c2430; --suave:#667085; --borde:#e3e6eb;
+          --verde:#0f9d58; --rojo:#d93025; --ambar:#b26b00; --acento:#1a56db; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo:#11151b; --tarjeta:#1a2029; --texto:#e6e9ee; --suave:#98a2b3; --borde:#2a323d;
+            --verde:#34c77b; --rojo:#ff6b5e; --ambar:#f0b44c; --acento:#6b9bff; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--fondo); color:var(--texto); }
+  header { padding:20px 16px 8px; max-width:960px; margin:auto; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  h1 { font-size:20px; margin:0; }
+  #actualizado { color:var(--suave); font-size:13px; }
+  main { max-width:960px; margin:auto; padding:8px 16px 40px; display:grid; gap:16px; }
+  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:12px; padding:16px; }
+  .fila { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .nombre { font-weight:650; font-size:17px; }
+  .estado { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid currentColor; }
+  .en-linea { color:var(--verde); } .desconectada { color:var(--rojo); } .desconocida { color:var(--suave); }
+  .datos { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin:14px 0; }
+  .dato small { display:block; color:var(--suave); font-size:12px; }
+  .dato b { font-size:20px; font-variant-numeric:tabular-nums; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--borde);
+           background:var(--tarjeta); color:var(--texto); cursor:pointer; }
+  button.primario { background:var(--acento); border-color:var(--acento); color:#fff; }
+  button.peligro { color:var(--rojo); border-color:var(--rojo); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .aviso { margin-top:10px; font-size:13px; color:var(--suave); min-height:1.4em; }
+  .aviso.mal { color:var(--rojo); } .aviso.bien { color:var(--verde); }
+  a { color:var(--acento); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Unidades Edge</h1>
+  <span id="actualizado">cargando…</span>
+</header>
+<main id="unidades"></main>
+
+<script>
+// Todo pasa por el servidor del panel (/api/...): el token nunca llega aqui.
+const $ = (s, e = document) => e.querySelector(s);
+const horaLocal = (iso) => iso ? new Date(iso).toLocaleString() : '—';   // la API da UTC
+const avisos = {};   // ultimo aviso de cada unidad, para no perderlo al refrescar
+
+async function pedir(metodo, ruta, cuerpo) {
+  const r = await fetch(ruta, {
+    method: metodo,
+    headers: cuerpo ? { 'Content-Type': 'application/json' } : {},
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+  });
+  let json = {};
+  try { json = await r.json(); } catch {}
+  return { ok: r.ok, codigo: r.status, json };
+}
+
+function avisar(id, texto, clase = '') {
+  avisos[id] = { texto, clase };
+  const el = $(`#aviso-${id}`);
+  if (el) { el.textContent = texto; el.className = 'aviso ' + clase; }
+}
+
+function tarjeta(u) {
+  const m = u.ultima_muestra || {};
+  const con = u.conexion || 'desconocida';
+  const clase = con === 'en linea' ? 'en-linea' : con;
+  const posicion = (m.lat != null && m.lon != null)
+    ? `<a target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${m.lat}&mlon=${m.lon}#map=17/${m.lat}/${m.lon}">${m.lat.toFixed(5)}, ${m.lon.toFixed(5)}</a>`
+    : 'sin GPS';
+  const a = avisos[u.device_id] || { texto: '', clase: '' };
+  return `
+  <section class="tarjeta" id="u-${u.device_id}">
+    <div class="fila">
+      <span class="nombre">${u.device_id}</span>
+      <span class="estado ${clase}">${con}</span>
+      <span style="color:var(--suave);font-size:13px">visto hace ${u.visto_hace_s ?? '—'} s</span>
+    </div>
+    <div class="datos">
+      <div class="dato"><small>A bordo</small><b>${m.pax_onboard ?? '—'}</b></div>
+      <div class="dato"><small>Subieron / bajaron</small><b>${m.pax_in ?? '—'} / ${m.pax_out ?? '—'}</b></div>
+      <div class="dato"><small>Velocidad</small><b>${m.speed_kph != null ? m.speed_kph.toFixed(1) + ' km/h' : '—'}</b></div>
+      <div class="dato"><small>Posición</small>${posicion}</div>
+      <div class="dato"><small>Último dato</small>${horaLocal(m.ts_device)}</div>
+    </div>
+    <div class="fila">
+      <button class="primario" data-accion="video" data-id="${u.device_id}">Ver video (60 s)</button>
+      <button data-accion="cerrar" data-id="${u.device_id}">Cortar video</button>
+      <button class="peligro" data-accion="apagar" data-id="${u.device_id}">Apagar unidad</button>
+    </div>
+    <div class="aviso ${a.clase}" id="aviso-${u.device_id}">${a.texto}</div>
+  </section>`;
+}
+
+async function refrescar() {
+  const r = await pedir('GET', '/api/unidades');
+  if (!r.ok) { $('#actualizado').textContent = 'error: ' + (r.json.error || r.codigo); return; }
+  const lista = r.json.unidades || [];
+  $('#unidades').innerHTML = lista.length ? lista.map(tarjeta).join('')
+    : '<p class="tarjeta">Aún no hay unidades con datos.</p>';
+  $('#actualizado').textContent = 'actualizado ' + new Date().toLocaleTimeString();
+}
+
+// Sigue una orden hasta que tenga estado final (o deje de cambiar)
+async function seguir(id, cid, mensajes) {
+  for (let i = 0; i < 30; i++) {
+    const r = await pedir('GET', `/api/comandos/${cid}`);
+    const st = r.json.status;
+    if (mensajes[st]) avisar(id, mensajes[st](r.json), st === 'aplicada' ? 'bien' : '');
+    if (['aplicada', 'rechazada', 'caducada', 'fallida'].includes(st)) {
+      if (st !== 'aplicada') avisar(id, `La orden quedó ${st}: ${r.json.detail || ''}`, 'mal');
+      return;
+    }
+    await new Promise((ok) => setTimeout(ok, 2000));
+  }
+}
+
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('button[data-accion]');
+  if (!b) return;
+  const id = b.dataset.id;
+  b.disabled = true;
+  try {
+    if (b.dataset.accion === 'video') {
+      // Se abre la ventana YA (dentro del clic) para que el navegador no la bloquee
+      const ventana = window.open('', '_blank');
+      avisar(id, 'Pidiendo video a la unidad… (unos 2 s)');
+      const r = await pedir('POST', `/api/unidades/${id}/video`, { reason: 'revision desde el panel', duration_s: 60 });
+      if (r.ok && r.json.visor) {
+        // El visor es http://: dentro de un sitio https un <iframe> se bloquearia
+        // (contenido mixto). Por eso se abre en su propia pestaña.
+        ventana.location = r.json.visor;
+        avisar(id, `Video abierto hasta ${horaLocal(r.json.expira)}. Quedan ${r.json.sessions_left} sesiones este mes.`, 'bien');
+      } else {
+        ventana && ventana.close();
+        const c = r.json.comando || {};
+        avisar(id, `No se abrió el video: ${c.detail || r.json.error || r.codigo}`, 'mal');
+      }
+    }
+    if (b.dataset.accion === 'cerrar') {
+      const r = await pedir('POST', `/api/unidades/${id}/cerrar-video`, { reason: 'cortado desde el panel' });
+      avisar(id, r.ok ? 'Video cortado.' : `No se pudo: ${r.json.detail || r.json.error}`, r.ok ? 'bien' : 'mal');
+    }
+    if (b.dataset.accion === 'apagar') {
+      const escrito = prompt(`Esto APAGA ${id} y no vuelve a encender sola: hay que ir a conectarla.\n\nEscribe ${id} para confirmar:`);
+      if (escrito !== id) { avisar(id, 'Apagado cancelado.'); return; }
+      const r = await pedir('POST', `/api/unidades/${id}/apagar`, { confirmar: id, reason: 'apagado desde el panel' });
+      if (!r.ok && r.codigo !== 202) { avisar(id, `No se pudo mandar: ${r.json.error || r.codigo}`, 'mal'); return; }
+      const sinConexion = r.json.unidad_sin_conexion;
+      if (sinConexion) {
+        avisar(id, 'La unidad está desconectada. Si vuelve en menos de 2 min se apagará; si no, la orden caduca.', 'mal');
+      }
+      await seguir(id, r.json.command_id, {
+        pendiente: sinConexion ? null : () => 'Orden enviada; esperando a la unidad…',
+        en_curso: () => 'La unidad se está apagando. Se marcará "aplicada" cuando la vuelvan a encender.',
+        aplicada: (c) => `Apagado confirmado (${c.detail || 'aplicada'}).`,
+      });
+    }
+  } finally {
+    b.disabled = false;
+  }
+});
+
+refrescar();
+setInterval(refrescar, 5000);
+</script>
+</body>
+</html>

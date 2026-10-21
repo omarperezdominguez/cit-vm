@@ -1,0 +1,55 @@
+# /etc/mediamtx/mediamtx.yml -- servidor de medios de Edge Mobility (ADR-001)
+# Generado desde ~/cit-vm/config/mediamtx.yml por instalar.sh, que sustituye
+# __IP_PUBLICA__ y anade al final un path por unidad con su passphrase SRT.
+# No editar el de /etc.
+#
+#   Jetson --SRT :8890 (passphrase)--> MediaMTX --WebRTC :8889 (ticket)--> navegador de RuTi
+#                                               '--HLS 127.0.0.1:8888--> tunel SSH (pruebas)
+
+logLevel: info
+logDestinations: [stdout]
+
+# Cada accion (publicar, leer, API) se le pregunta a api.py, que conoce los
+# tickets de video. Si api.py no responde, se niega todo: por eso cit-api
+# se reinicia solo (Restart=always).
+#   - desde 127.0.0.1: todo permitido (API local, lectura por tunel)
+#   - publish: solo paths cit-NNN; la passphrase SRT es la llave real
+#   - read desde fuera: solo con ?ticket= vigente y del mismo path
+authMethod: http
+authHTTPAddress: http://127.0.0.1:8081/mediamtx/auth
+authHTTPExclude: []
+
+# La consulta el servicio de Edge: /v3/paths/get/cit-001
+api: yes
+apiAddress: 127.0.0.1:9997
+metrics: no
+pprof: no
+playback: no
+
+rtsp: no
+rtmp: no
+# MoQ viene encendido por omision desde la v1.21; no se usa
+moq: no
+
+# HLS solo en localhost: ver el video desde una laptop por tunel SSH (README).
+hls: yes
+hlsAddress: 127.0.0.1:8888
+# Las sesiones duran <= 60 s: se segmenta en cuanto llega el flujo.
+hlsAlwaysRemux: yes
+
+# WebRTC hacia los clientes de la plataforma (con ticket).
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+# Respaldo por TCP para redes que bloquean UDP
+webrtcLocalTCPAddress: :8189
+# La VM esta detras del NAT 1:1 de GCP: sus interfaces solo tienen la IP
+# interna, que un navegador de fuera no puede alcanzar.
+webrtcIPsFromInterfaces: no
+webrtcAdditionalHosts: [__IP_PUBLICA__]
+
+srt: yes
+srtAddress: :8890
+
+# Solo existen los paths declarados: publicar en otro nombre se rechaza.
+paths:

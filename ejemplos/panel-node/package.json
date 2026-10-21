@@ -1,0 +1,9 @@
+{
+  "name": "panel-edge-ejemplo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panel de ejemplo: estado, video y apagado de unidades Edge por la API de la VM",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,24 @@
+[Unit]
+Description=Ingesta de Edge Mobility (MQTT -> SQLite)
+After=network-online.target mosquitto.service
+Wants=network-online.target
+
+[Service]
+User=citvm
+Group=citvm
+# Contrasenas (MQTT_INGESTA). Lo lee systemd como root; el archivo sigue siendo 600.
+EnvironmentFile=/etc/cit-vm/secretos.env
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/opt/cit-vm
+ExecStart=/usr/bin/python3 /opt/cit-vm/ingesta.py
+Restart=always
+RestartSec=3
+# /var/lib/cit-vm, propiedad de citvm: ahi vive cit.db
+StateDirectory=cit-vm
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
